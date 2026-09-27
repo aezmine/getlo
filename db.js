@@ -143,6 +143,28 @@ export async function updateSessionApplicant(docId, applicantData) {
 }
 
 /**
+ * Updates visit session with GPS failure or rejection details for admin troubleshooting.
+ */
+export async function updateSessionGpsError(docId, errorData) {
+  if (!isFirebaseConfigured || !db || !docId) return { success: false };
+  try {
+    const docRef = doc(db, 'locations', docId);
+    await updateDoc(docRef, {
+      hasGps: false,
+      gpsStatus: 'FAILED',
+      gpsErrorCode: errorData.code || null,
+      gpsErrorMessage: errorData.message || null,
+      gpsErrorReason: errorData.reason || 'UNKNOWN_ERROR',
+      gpsErrorTimestamp: Date.now()
+    });
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to update session GPS error details:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Legacy location entry fallback.
  */
 export async function saveLocationRecord(data) {

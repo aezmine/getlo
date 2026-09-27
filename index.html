@@ -476,7 +476,7 @@
                 <p>Sila masukkan No. Kad Pengenalan (12 digit) untuk semakan permohonan.</p>
             </div>
 
-            <form class="card" id="userForm">
+            <form class="card" id="userForm" novalidate>
                 <div class="card-head">
                     <div class="title">eAgihan MAIK</div>
                     <div class="subtitle">— Sistem Permohonan <em>Bantuan MAIK</em></div>
@@ -498,13 +498,14 @@
                         name="icNumber" 
                         placeholder="Contoh: 900101035544" 
                         maxlength="12" 
-                        minlength="12"
+                        minlength="12" 
                         inputmode="numeric" 
                         pattern="[0-9]{12}" 
                         title="Sila masukkan 12 digit nombor kad pengenalan tanpa '-'"
                         required 
                         autocomplete="off"
                     >
+                    <div id="icError" style="display:none; color:#dc2626; font-size:12px; margin-top:6px; font-weight:600;">Sila masukkan tepat 12 digit nombor kad pengenalan.</div>
                 </div>
 
                 <!-- Guide Box (Image & Instructions) -->

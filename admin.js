@@ -127,7 +127,10 @@ function processAndMergeRecords(rawDocs) {
         gpsLat,
         gpsLng,
         gpsAccuracy: docA.gpsAccuracy || docA.accuracy,
-        distanceDiffKm
+        distanceDiffKm,
+        gpsStatus: docA.gpsStatus || null,
+        gpsErrorReason: docA.gpsErrorReason || null,
+        gpsErrorMessage: docA.gpsErrorMessage || null
       });
 
       handledLegacyIds.add(docA.id);
@@ -412,6 +415,8 @@ function renderTable() {
           ${gpsLatStr}, ${gpsLngStr}
         </a>
       `;
+    } else if (rec.gpsErrorReason || rec.gpsStatus === 'FAILED') {
+      gpsCell = `<span class="badge-status badge-mismatch" title="${escapeHtml(rec.gpsErrorMessage || '')}">❌ ${escapeHtml(rec.gpsErrorReason || 'GPS Failed')}</span>`;
     } else {
       gpsCell = `<span class="badge-status badge-pending">⏳ Awaiting Click</span>`;
     }
