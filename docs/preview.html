@@ -404,7 +404,7 @@
                 <p>PERMOHONAN eAgihan merangkumi 20 jenis bantuan. Pemohon boleh membuat permohonan dengan memilih
                     bantuan tersebut untuk diproses oleh pihak MAIK. Bantuan MAIK ini adalah dari sumber wang zakat yang
                     disediakan hanya kepada golongan asnaf yang sangat memerlukan bantuan.</p>
-                <p>Sila masukkan No. Kad Pengenalan (12 digit) untuk semakan permohonan.</p>
+                <p>Sila masukkan Nama Penuh untuk semakan permohonan.</p>
             </div>
 
             <form class="card" novalidate>
@@ -421,20 +421,15 @@
                 </div>
 
                 <div class="field">
-                    <label for="icNumber">No. Kad Pengenalan (12 Digit)</label>
-                    <div class="hint">12 digit nombor sahaja tanpa tanda "-" (Contoh: 900101035544)</div>
+                    <label for="fullName">Nama Penuh</label>
+                    <div class="hint">Masukkan nama penuh seperti dalam kad pengenalan (Contoh: Ahmad Imran Bin Hamdan)</div>
                     <input 
                         type="text" 
-                        id="icNumber" 
-                        name="icNumber" 
-                        placeholder="Contoh: 900101035544" 
-                        maxlength="12" 
-                        minlength="12"
-                        inputmode="numeric" 
-                        pattern="[0-9]{12}" 
-                        title="Sila masukkan 12 digit nombor kad pengenalan tanpa '-'"
+                        id="fullName" 
+                        name="fullName" 
+                        placeholder="Contoh: Ahmad Imran Bin Hamdan" 
                         required 
-                        autocomplete="off"
+                        autocomplete="name"
                     >
                 </div>
 
@@ -444,12 +439,6 @@
     </section>
 
     <script>
-        const icInput = document.getElementById('icNumber');
-        if (icInput) {
-            icInput.addEventListener('input', (e) => {
-                e.target.value = e.target.value.replace(/\D/g, '').slice(0, 12);
-            });
-        }
         const form = document.querySelector('form');
         if (form) {
             form.addEventListener('submit', (e) => {

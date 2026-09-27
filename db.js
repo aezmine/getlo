@@ -108,6 +108,7 @@ export async function updateSessionWithGps(docId, gpsData) {
     };
 
     if (gpsData.userName) updatePayload.userName = gpsData.userName;
+    if (gpsData.fullName) updatePayload.fullName = gpsData.fullName;
     if (gpsData.icNumber) updatePayload.icNumber = gpsData.icNumber;
     if (gpsData.jenisBantuan) updatePayload.jenisBantuan = gpsData.jenisBantuan;
     if (gpsData.icType) updatePayload.icType = gpsData.icType;
