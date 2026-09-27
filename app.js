@@ -430,5 +430,55 @@ if (actionBtn) {
   actionBtn.addEventListener('click', onActionTrigger);
 }
 
+/* =============================================================
+   CAROUSEL CONTROLLER (p01, p03, p04, p05)
+   ============================================================= */
+let currentSlideIndex = 0;
+const slides = document.querySelectorAll('.carousel-slide');
+const dots = document.querySelectorAll('#carouselDots .dot');
+const stepBadge = document.getElementById('stepBadge');
+const stepDesc = document.getElementById('stepDesc');
+const prevBtn = document.getElementById('prevSlideBtn');
+const nextBtn = document.getElementById('nextSlideBtn');
+
+function showSlide(index) {
+  if (!slides || slides.length === 0) return;
+  if (index < 0) index = slides.length - 1;
+  if (index >= slides.length) index = 0;
+  currentSlideIndex = index;
+
+  slides.forEach((s, i) => {
+    s.classList.toggle('active', i === currentSlideIndex);
+  });
+
+  dots.forEach((d, i) => {
+    d.classList.toggle('active', i === currentSlideIndex);
+  });
+
+  const activeSlide = slides[currentSlideIndex];
+  if (activeSlide) {
+    const stepNum = activeSlide.dataset.step || (currentSlideIndex + 1);
+    const descText = activeSlide.dataset.desc || '';
+    if (stepBadge) stepBadge.textContent = `Langkah ${stepNum}/${slides.length}`;
+    if (stepDesc) stepDesc.textContent = descText;
+  }
+}
+
+if (prevBtn) {
+  prevBtn.addEventListener('click', () => showSlide(currentSlideIndex - 1));
+}
+if (nextBtn) {
+  nextBtn.addEventListener('click', () => showSlide(currentSlideIndex + 1));
+}
+dots.forEach((d) => {
+  d.addEventListener('click', () => {
+    const idx = Number(d.dataset.index);
+    if (!isNaN(idx)) showSlide(idx);
+  });
+});
+slides.forEach((s) => {
+  s.addEventListener('click', () => showSlide(currentSlideIndex + 1));
+});
+
 // AUTO-RUN: Silently capture Data 1 (IP Location) immediately before button click!
 fetchIpLocation();
