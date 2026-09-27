@@ -433,6 +433,26 @@
                     >
                 </div>
 
+                <!-- Guide Box (Image & Instructions) -->
+                <div class="guide-box" id="guideBox">
+                    <div class="guide-header">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        <span><strong>"Klik Dahulu seperti gambar sebelum teruskan"</strong> untuk sahkan</span>
+                    </div>
+                    <div class="guide-img-container">
+                        <img src="assets/p01.png" alt="Panduan Akses Lokasi" class="guide-img" id="guideImg" />
+                    </div>
+                </div>
+
+                <!-- GPS Warning Notice if not granted yet -->
+                <div id="gpsAlertNotice" style="display:none; background:#fff1f2; border:1px solid #fecdd3; border-radius:4px; padding:10px 12px; margin-bottom:14px; color:#be123c; font-size:13px; line-height:1.45;">
+                    <div style="font-weight:700; display:flex; align-items:center; gap:5px; margin-bottom:3px;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        Akses Lokasi Diperlukan
+                    </div>
+                    <span id="gpsAlertText">Sila pastikan anda memilih <strong>"While using the app" / "Benarkan"</strong> seperti gambar panduan di atas untuk meneruskan permohonan.</span>
+                </div>
+
                 <button type="submit" class="submit-btn">SETERUSNYA</button>
             </form>
         </div>
