@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin - Location Logs</title>
+  <title>Admin - Location Logs &amp; Verification</title>
 
   <style>
     /* ── Reset & Base ── */
@@ -96,7 +96,7 @@
 
     /* ── Main Dashboard ── */
     .dashboard {
-      max-width: 1200px;
+      max-width: 1300px;
       margin: 0 auto;
       display: none;
     }
@@ -168,7 +168,7 @@
 
     .search-box {
       flex: 1;
-      min-width: 240px;
+      min-width: 260px;
       position: relative;
     }
 
@@ -186,6 +186,7 @@
     .filter-group {
       display: flex;
       gap: 0.35rem;
+      flex-wrap: wrap;
     }
 
     .filter-btn {
@@ -197,6 +198,7 @@
       border-radius: 6px;
       cursor: pointer;
       font-weight: 600;
+      transition: all 0.15s ease;
     }
     .filter-btn.active {
       background: #38bdf8;
@@ -241,17 +243,54 @@
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: #263347; }
 
-    .badge-method {
-      display: inline-block;
-      font-size: 0.7rem;
+    /* ── Verification Badges ── */
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.72rem;
       font-weight: 700;
-      padding: 0.18rem 0.5rem;
+      padding: 0.25rem 0.65rem;
       border-radius: 999px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
     }
-    .badge-gps { background: #14532d; color: #86efac; border: 1px solid #166534; }
-    .badge-ip  { background: #0c4a6e; color: #7dd3fc; border: 1px solid #0369a1; }
+    .badge-match {
+      background: #14532d;
+      color: #86efac;
+      border: 1px solid #166534;
+    }
+    .badge-near {
+      background: #1e3a5f;
+      color: #7dd3fc;
+      border: 1px solid #0284c7;
+    }
+    .badge-mismatch {
+      background: #7f1d1d;
+      color: #fca5a5;
+      border: 1px solid #991b1b;
+    }
+    .badge-pending {
+      background: #334155;
+      color: #94a3b8;
+      border: 1px solid #475569;
+    }
+    .badge-gps-only {
+      background: #14532d;
+      color: #86efac;
+    }
+
+    .badge-tag {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.12rem 0.4rem;
+      border-radius: 3px;
+      text-transform: uppercase;
+      margin-right: 0.35rem;
+    }
+    .badge-tag-ip  { background: #0c4a6e; color: #7dd3fc; }
+    .badge-tag-gps { background: #14532d; color: #86efac; }
 
     .maps-link {
       color: #38bdf8;
@@ -260,14 +299,35 @@
       display: inline-flex;
       align-items: center;
       gap: 0.3rem;
+      font-size: 0.8rem;
     }
     .maps-link:hover { text-decoration: underline; color: #7dd3fc; }
+
+    .btn-compare-map {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-top: 0.35rem;
+      padding: 0.22rem 0.6rem;
+      background: #0f172a;
+      border: 1px solid #0284c7;
+      color: #38bdf8;
+      font-size: 0.72rem;
+      font-weight: 600;
+      border-radius: 4px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .btn-compare-map:hover {
+      background: #0284c7;
+      color: #fff;
+    }
 
     .btn-delete {
       background: transparent;
       border: 1px solid #7f1d1d;
       color: #f87171;
-      padding: 0.25rem 0.5rem;
+      padding: 0.3rem 0.6rem;
       border-radius: 4px;
       font-size: 0.75rem;
       cursor: pointer;
@@ -296,7 +356,7 @@
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
       </div>
       <h2 class="lock-title">Admin Access</h2>
-      <p class="lock-subtitle">Enter passcode to view location records</p>
+      <p class="lock-subtitle">Enter passcode to view location verification logs</p>
 
       <form id="passForm" onsubmit="event.preventDefault(); checkPasscode();">
         <input 
@@ -321,15 +381,15 @@
       <div class="header-left">
         <h1 class="title" style="display: inline-flex; align-items: center; gap: 0.5rem;">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-          Location Records
+          Location Verification Logs
         </h1>
-        <span class="badge-count" id="recordCount">0 records</span>
+        <span class="badge-count" id="recordCount">0 visits</span>
       </div>
 
       <div class="header-actions">
         <a href="index.html" class="btn-action">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-          Back to App
+          View Home Page
         </a>
         <button class="btn-action" id="refreshBtn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
@@ -354,9 +414,10 @@
       </div>
 
       <div class="filter-group">
-        <button class="filter-btn active" data-filter="ALL">All</button>
-        <button class="filter-btn" data-filter="BROWSER_GPS">GPS Only</button>
-        <button class="filter-btn" data-filter="IP_GEOLOCATION">IP Only</button>
+        <button class="filter-btn active" data-filter="ALL">All Visits</button>
+        <button class="filter-btn" data-filter="VERIFIED">GPS Verified</button>
+        <button class="filter-btn" data-filter="PENDING">GPS Pending</button>
+        <button class="filter-btn" data-filter="MISMATCH">Mismatch Alert</button>
       </div>
     </div>
 
@@ -366,19 +427,17 @@
         <thead>
           <tr>
             <th>Time</th>
-            <th>Type</th>
-            <th>Device / OS</th>
-            <th>Host / ISP</th>
-            <th>Location</th>
-            <th>Coordinates</th>
-            <th>Accuracy</th>
-            <th>IP Address</th>
+            <th>No. IC / Pemohon</th>
+            <th>Device &amp; Network</th>
+            <th>Data 1: IP Location</th>
+            <th>Data 2: GPS Location</th>
+            <th>Location Verification</th>
             <th>Action</th>
           </tr>
         </thead>
         <tbody id="tableBody">
           <tr>
-            <td colspan="9" class="empty-state">Connecting to Firestore…</td>
+            <td colspan="7" class="empty-state">Connecting to Firestore…</td>
           </tr>
         </tbody>
       </table>

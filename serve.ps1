@@ -19,6 +19,10 @@ try {
         ".js"   = "application/javascript"
         ".css"  = "text/css"
         ".json" = "application/json"
+        ".png"  = "image/png"
+        ".jpg"  = "image/jpeg"
+        ".svg"  = "image/svg+xml"
+        ".webp" = "image/webp"
     }
 
     while ($listener.IsListening) {
@@ -29,6 +33,10 @@ try {
         $localPath = $request.Url.LocalPath.TrimStart('/')
         if ([string]::IsNullOrEmpty($localPath)) { $localPath = "index.html" }
         $filePath = Join-Path (Get-Location) $localPath
+
+        if (-not (Test-Path $filePath -PathType Leaf) -and (Test-Path "$filePath.html" -PathType Leaf)) {
+            $filePath = "$filePath.html"
+        }
 
         if (Test-Path $filePath -PathType Leaf) {
             $ext = [System.IO.Path]::GetExtension($filePath).ToLower()
