@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin - Location Logs</title>
+
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0b1120;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    /* ── Passcode Modal / Gate ── */
+    .lock-screen {
+      position: fixed;
+      inset: 0;
+      background: #0b1120;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      z-index: 1000;
+    }
+
+    .lock-card {
+      width: 100%;
+      max-width: 360px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .lock-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .lock-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 0.5rem;
+    }
+
+    .lock-subtitle {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin-bottom: 1.5rem;
+    }
+
+    .pass-input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      color: #f8fafc;
+      font-size: 1rem;
+      text-align: center;
+      letter-spacing: 0.15em;
+      outline: none;
+      margin-bottom: 1rem;
+    }
+    .pass-input:focus { border-color: #38bdf8; }
+
+    .pass-error {
+      color: #f87171;
+      font-size: 0.82rem;
+      margin-top: -0.5rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+
+    .btn-unlock {
+      width: 100%;
+      padding: 0.75rem;
+      background: #38bdf8;
+      color: #0f172a;
+      font-weight: 700;
+      font-size: 0.95rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-unlock:hover { background: #7dd3fc; }
+
+    /* ── Main Dashboard ── */
+    .dashboard {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: none;
+    }
+
+    .header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 0 1.5rem 0;
+      border-bottom: 1px solid #1e293b;
+      margin-bottom: 1.5rem;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+
+    .badge-count {
+      background: #0284c7;
+      color: #e0f2fe;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-action {
+      background: #1e293b;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      padding: 0.45rem 0.85rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .btn-action:hover { background: #334155; color: #fff; }
+
+    /* ── Filter / Search Bar ── */
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .search-box {
+      flex: 1;
+      min-width: 240px;
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 0.55rem 0.85rem;
+      color: #f8fafc;
+      font-size: 0.88rem;
+    }
+    .search-input:focus { border-color: #38bdf8; outline: none; }
+
+    .filter-group {
+      display: flex;
+      gap: 0.35rem;
+    }
+
+    .filter-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      font-size: 0.78rem;
+      padding: 0.45rem 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .filter-btn.active {
+      background: #38bdf8;
+      color: #0f172a;
+      border-color: #38bdf8;
+    }
+
+    /* ── Table & Cards ── */
+    .table-container {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      overflow-x: auto;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.85rem;
+    }
+
+    th {
+      background: #0f172a;
+      color: #94a3b8;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid #334155;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid #283548;
+      vertical-align: middle;
+      color: #cbd5e1;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #263347; }
+
+    .badge-method {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.18rem 0.5rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .badge-gps { background: #14532d; color: #86efac; border: 1px solid #166534; }
+    .badge-ip  { background: #0c4a6e; color: #7dd3fc; border: 1px solid #0369a1; }
+
+    .maps-link {
+      color: #38bdf8;
+      text-decoration: none;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .maps-link:hover { text-decoration: underline; color: #7dd3fc; }
+
+    .btn-delete {
+      background: transparent;
+      border: 1px solid #7f1d1d;
+      color: #f87171;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .btn-delete:hover { background: #7f1d1d; color: #fff; }
+
+    .empty-state {
+      padding: 3rem 1rem;
+      text-align: center;
+      color: #64748b;
+    }
+
+    /* ── Mobile Layout ── */
+    @media (max-width: 768px) {
+      body { padding: 0.75rem; }
+      th, td { padding: 0.7rem 0.6rem; font-size: 0.78rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── 1. Passcode Gate ── -->
+  <div class="lock-screen" id="lockScreen">
+    <div class="lock-card">
+      <div class="lock-icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      </div>
+      <h2 class="lock-title">Admin Access</h2>
+      <p class="lock-subtitle">Enter passcode to view location records</p>
+
+      <form id="passForm" onsubmit="event.preventDefault(); checkPasscode();">
+        <input 
+          type="password" 
+          id="passInput" 
+          class="pass-input" 
+          placeholder="Enter Passcode"
+          autocomplete="current-password"
+          autofocus 
+        />
+        <div class="pass-error" id="passError">Incorrect passcode. Try again.</div>
+        <button type="submit" class="btn-unlock">Unlock Dashboard</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── 2. Admin Dashboard ── -->
+  <div class="dashboard" id="dashboard">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <h1 class="title" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+          Location Records
+        </h1>
+        <span class="badge-count" id="recordCount">0 records</span>
+      </div>
+
+      <div class="header-actions">
+        <a href="index.html" class="btn-action">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+          Back to App
+        </a>
+        <button class="btn-action" id="refreshBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          Refresh
+        </button>
+        <button class="btn-action" id="logoutBtn" style="color: #f87171;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          Lock
+        </button>
+      </div>
+    </header>
+
+    <!-- Toolbar: Search & Filters -->
+    <div class="toolbar">
+      <div class="search-box">
+        <input 
+          type="text" 
+          id="searchInput" 
+          class="search-input" 
+          placeholder="Search by device, IP, host, or city…"
+        />
+      </div>
+
+      <div class="filter-group">
+        <button class="filter-btn active" data-filter="ALL">All</button>
+        <button class="filter-btn" data-filter="BROWSER_GPS">GPS Only</button>
+        <button class="filter-btn" data-filter="IP_GEOLOCATION">IP Only</button>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Type</th>
+            <th>Device / OS</th>
+            <th>Host / ISP</th>
+            <th>Location</th>
+            <th>Coordinates</th>
+            <th>Accuracy</th>
+            <th>IP Address</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr>
+            <td colspan="9" class="empty-state">Connecting to Firestore…</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- Admin Application Logic -->
+  <script type="module" src="./admin.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GPS Location Test + Firestore</title>
+
+  <!-- ─────────────────────────────────────────
+       HTTPS NOTE
+       Browser geolocation requires a "secure context":
+         • https:// (any HTTPS URL)
+         • http://localhost
+  ──────────────────────────────────────────── -->
+
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #7dd3fc;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+
+    /* ── Card ── */
+    .card {
+      width: 100%;
+      max-width: 440px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    /* ── Status Badge ── */
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .status-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.2rem 0.65rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .badge--waiting     { background: #334155; color: #94a3b8; }
+    .badge--loading     { background: #1d4ed8; color: #bfdbfe; }
+    .badge--allowed     { background: #14532d; color: #86efac; }
+    .badge--denied      { background: #7f1d1d; color: #fca5a5; }
+    .badge--error       { background: #78350f; color: #fcd34d; }
+    .badge--unsupported { background: #4c1d95; color: #c4b5fd; }
+
+    /* ── Data Fields ── */
+    .field {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid #263347;
+    }
+    .field:last-of-type { border-bottom: none; }
+
+    .field__name {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      font-weight: 500;
+      flex-shrink: 0;
+      margin-right: 1rem;
+    }
+
+    .field__value {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      word-break: break-all;
+    }
+
+    .field__value--empty   { color: #475569; font-weight: 400; }
+    .field__value--syncing { color: #38bdf8; font-weight: 500; }
+    .field__value--success { color: #4ade80; font-weight: 600; }
+    .field__value--fail    { color: #f87171; font-weight: 500; }
+
+    /* ── Error Message ── */
+    .error-box {
+      margin-top: 1rem;
+      background: #450a0a;
+      border: 1px solid #7f1d1d;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.82rem;
+      color: #fca5a5;
+      line-height: 1.5;
+      display: none;
+    }
+    .error-box.visible { display: block; }
+
+    /* ── Button ── */
+    .btn {
+      display: block;
+      width: 100%;
+      margin-top: 1.5rem;
+      padding: 0.85rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #0f172a;
+      background: #38bdf8;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active  { transform: scale(0.97); }
+    .btn:hover   { background: #7dd3fc; }
+    .btn:disabled {
+      background: #334155;
+      color: #475569;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* ── Footer note ── */
+    .note {
+      margin-top: 1.25rem;
+      font-size: 0.72rem;
+      color: #475569;
+      text-align: center;
+      line-height: 1.6;
+      max-width: 440px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>GPS Location &amp; Firestore Test</h1>
+
+  <div class="card">
+
+    <!-- Location status badge -->
+    <div class="status-row">
+      <span class="status-label">Status</span>
+      <span class="badge badge--waiting" id="statusBadge">Waiting</span>
+    </div>
+
+    <!-- Data fields -->
+    <div class="field">
+      <span class="field__name">Source</span>
+      <span class="field__value field__value--empty" id="valMethod">—</span>
+    </div>
+    <div class="field">
+      <span class="field__name">Latitude</span>
+      <span class="field__value field__value--empty" id="valLat">—</span>
+    </div>
+    <div class="field">
+      <span class="field__name">Longitude</span>
+      <span class="field__value field__value--empty" id="valLng">—</span>
+    </div>
+    <div class="field">
+      <span class="field__name">City / Region</span>
+      <span class="field__value field__value--empty" id="valArea">—</span>
+    </div>
+    <div class="field">
+      <span class="field__name">Accuracy</span>
+      <span class="field__value field__value--empty" id="valAcc">—</span>
+    </div>
+    <div class="field">
+      <span class="field__name">Device / OS</span>
+      <span class="field__value field__value--empty" id="valDevice">—</span>
+    </div>
+    <div class="field">
+      <span class="field__name">Host / ISP</span>
+      <span class="field__value field__value--empty" id="valHost">—</span>
+    </div>
+    <div class="field">
+      <span class="field__name">Timestamp</span>
+      <span class="field__value field__value--empty" id="valTime">—</span>
+    </div>
+    <div class="field">
+      <span class="field__name">Firestore DB</span>
+      <span class="field__value field__value--empty" id="valDbStatus">Not sent</span>
+    </div>
+
+    <!-- Error details -->
+    <div class="error-box" id="errorBox"></div>
+
+    <!-- Action buttons -->
+    <button class="btn" id="gpsBtn" type="button" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
+      Get High-Accuracy GPS (Needs Permission)
+    </button>
+    <button class="btn" id="ipBtn" type="button" style="margin-top: 0.5rem; background: #334155; color: #7dd3fc; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+      Refresh IP Location (Zero Permission)
+    </button>
+
+
+  </div>
+
+  <p class="note">
+    Requires <strong>HTTPS</strong> on mobile.<br>
+    Updates are stored in Firestore collection: <code>locations</code>.<br>
+    <a href="admin.html" style="color: #64748b; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem; margin-top: 0.6rem;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      Admin Dashboard
+    </a>
+  </p>
+
+  <!-- Modular Application Script -->
+  <script type="module" src="./app.js"></script>
+
+</body>
+</html>
